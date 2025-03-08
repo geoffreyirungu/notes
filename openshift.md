@@ -226,7 +226,7 @@ There is a general pattern for addressing a resource in an oc command line. You 
 the action you want to do, the kind of object you want to do it to, and the name
 of that specific object: 
 
-<pre> oc <verb> <kind> <name> </pre>
+``` oc <verb> <kind> <name> ```
 
 Specifying a kind but not a name refers to all the objects of that kind.
 eg. oc get pods   (lists all the pods running in the current project)
