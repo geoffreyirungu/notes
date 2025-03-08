@@ -163,16 +163,16 @@ is included with the OpenShift Container Platform.
 Health-checking probes provide the polling(checking the status repeatedly) functionality to guarantee that your application is up, healthy, and responding as expected. 
 There are three common health checks that you can configure when deploying your application on OpenShift: Readiness, Liveness, and Startup.
 
-## Readiness probe
+1. ## Readiness probe
 A readiness probe determines whether a container is ready to accept service requests. 
 If the readiness probe fails for a container, it will be removed from the list of available service endpoints(connection point(IP and port) where a pod can be accessed). 
 After a failure, the probe continues to poll the pod. If it becomes available, OpenShift will add the pod to the list of available service endpoints.
 
-## Liveness probe
+2. ## Liveness probe
 A liveness probe determines whether a container is still running.
 If the liveness probe fails, Kubernetes will consider the container to be unhealthy and will restart the container to bring it back to a healthy state.
 
-## Startup probe
+3. ## Startup probe
 A startup probe indicates whether the application within a container is started.
 All other probes are disabled until the startup succeeds. If the startup probe does not succeed within a specified period, OpenShift will kill the container, usually
 restarting it immediately after.
@@ -182,22 +182,22 @@ A Deployment Strategy allows you to determine how your application is rolled out
 killed for some other reason.
 
 ## Deployment Strategies on OpenShift
-## Rolling Update(Default Strategy in OpenShift)
+1. ## Rolling Update(Default Strategy in OpenShift)
 In this strategy, Kubernetes/OpenShift gradually replaces old pods with new ones, ensuring that the application remains available during the update(No downtime).
 
-## Canary Deployment
+2. ## Canary Deployment
 A canary deployment tests a new version of an application before rolling it out to the entire user base of that app.
 In fact, in OpenShift, all rolling deployments are canary deployments. The canary version, or the new version in a deployment update, is tested before all the old
 instances of that deployment are replaced. If the canary crashes immediately or if a configured readiness check never succeeds, the canary will be removed and
 the deployment will be automatically rolled back to the previously known working deployment.
 
-## Recreate
+3. ## Recreate
 The Recreate strategy stops all the old pods before creating the new ones. 
 This strategy can cause downtime during the transition, as no pods are running while the update happens.
 This strategy is useful for applications where downtime is acceptable and it is necessary to completely replace the old version with the new one.
 It can also be used when you want your deployment to use a persistent volume with strict writing requirements that specify that only one pod can mount the volume at a time.
 
-## Custom Deployment Strategy
+4. ## Custom Deployment Strategy
 Custom deployment strategy is a user-defined approach for deploying and updating applications, which goes beyond the standard deployment strategies (like Rolling Update, Recreate, or Canary) offered by default. 
 This type of deployment strategy allows you to run custom commands for each rollout, and you are able to base your deployment rollout on the specific needs of a given
 application as well.
@@ -226,7 +226,7 @@ There is a general pattern for addressing a resource in an oc command line. You 
 the action you want to do, the kind of object you want to do it to, and the name
 of that specific object: 
 
-<pre> ```oc <verb> <kind> <name> ```</pre>
+<pre> oc <verb> <kind> <name> </pre>
 
 Specifying a kind but not a name refers to all the objects of that kind.
 eg. oc get pods   (lists all the pods running in the current project)
