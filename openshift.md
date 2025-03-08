@@ -379,57 +379,59 @@ The oc new-app command in OpenShift is used to create a new application by autom
 ## Common usages of oc new-app
 1. Create an application from a Git repository
 ```
-	oc new-app https://github.com/openshift/ruby-hello-world.git   (creates the build config, deployment config, service and route)
+oc new-app https://github.com/openshift/ruby-hello-world.git   (creates the build config, deployment config, service and route)
 ```
 
 2. Create an application from a pre-built image
 3. Create an application from an OpenShift template:
 ```
-	oc new-app -p HOST=el-event-listener-499pkk -p PORT=8080 -p TOKEN=2qnVM9Zhw3PCmvh766PMlk5LKRx_4EYx9m31ucQLmv5trBd9G -f C:/Users/gkairu/OC/templates/ngrok4.yml
+oc new-app -p HOST=el-event-listener-499pkk -p PORT=8080 -p TOKEN=2qnVM9Zhw3PCmvh766PMlk5LKRx_4EYx9m31ucQLmv5trBd9G -f C:/Users/gkairu/OC/templates/ngrok4.yml
 ```
 4. Create an application from an existing Docker image or registry
 
 ## oc apply
 The oc apply command in OpenShift (and Kubernetes) is used to create, update, or modify resources such as Pods, Deployments, Services, and ConfigMaps within the cluster:
-
+```
 oc apply -f <filename> [options]
-
+```
+```
 oc apply -f C:/Users/gkairu/OC/roleAndRolebindings/service-binding-operator-role.yml
-
+```
 You can also apply multiple files by specifying a directory:
-
+```
 oc apply -f /path/to/directory/
-
+```
 Create or update from standard input:
-
+```
 echo -e "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: nginx\nspec:\n  replicas: 3\n" | oc apply -f -
-
+```
 If a resource already exists, oc apply will apply only the changes defined(merges changes) in the provided configuration without overwriting the entire resource. 
 When you use oc apply, OpenShift stores the resource configurations as "previous versions" in its internal management system. This allows for easy rollback if needed (via oc rollout undo).
 
 ## oc replace
 The oc replace command in OpenShift (and its Kubernetes counterpart kubectl replace) is used to replace an existing resource with a new one.
 It overwrites/replaces the existing resource:
-
+```
 oc replace -f <resource_file>
-
+```
 If the resource does not exist, it will return an error (resource not found).
 With oc replace, there is no merging of configuration or tracking of history. This is different from oc apply, which attempts to merge changes and only applies the differences.
 
 ## oc run
 The oc run command in OpenShift is used to create and run a pod or deployment in OpenShift, typically for debugging, testing, or running one-off tasks:
-
+```
 oc run NAME --image=IMAGE [flags]
-
+```
+```
 oc run -i --tty --image=image-registry.openshift-image-registry.svc:5000/openshift/java:openjdk-17-ubi8 --rm debug -- /bin/sh
-
+```
 ## oc adm
 The oc adm (OpenShift Cluster Administration)command in OpenShift is a command-line tool that provides administrative functions and operations for managing OpenShift clusters.
 
 An example of oc adm command:
-
+```
 oc adm policy add-scc-to-user anyuid -z default -n o4d-noted
-
+```
 This command is adding the anyuid Security Context Constraint (SCC) to the default service account in the o4d-noted namespace.
 
 
