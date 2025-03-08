@@ -87,10 +87,10 @@ OR
 A Kubernetes operator is a method of packaging, deploying, and managing an application by extending the functionality of the Kubernetes API.
 It introduces new object types beyond the default resources (like Pods, Deployments, etc.) through Custom Resource Definitions, an extension mechanism in Kubernetes.
 
-##CatalogSource
+## CatalogSource
 A CatalogSource represents a store of metadata that OLM(Operator Lifecycle Manager) can query to discover and install operators and their dependencies.
 
-##OperatorSource
+## OperatorSource
 An OperatorSource is a Kubernetes/OpenShift resource that defines the location or source from where an operator is retrieved, allowing the system to download and install the operator on the cluster.
 It is part of the broader Operator framework and plays a crucial role in making Operators available to Kubernetes clusters.
 
