@@ -441,29 +441,29 @@ Security Context Constraints (SCCs) are mechanisms to control permissions for po
 These permissions determine the actions that a pod can perform and what resources it can access.
 Security context constraints allow an administrator to control:
 
-	Whether a pod can run privileged containers with the allowPrivilegedContainer flag
+1. Whether a pod can run privileged containers with the allowPrivilegedContainer flag
 
-	Whether a pod is constrained with the allowPrivilegeEscalation flag
+2. Whether a pod is constrained with the allowPrivilegeEscalation flag
 
-	The capabilities that a container can request
+3. The capabilities that a container can request
 
-	The use of host directories as volumes
+4. The use of host directories as volumes
 
-	The SELinux context of the container
+5. The SELinux context of the container
 
-	The container user ID
+6. The container user ID
 
-	The use of host namespaces and networking
+7. The use of host namespaces and networking
 
-	The allocation of an FSGroup that owns the pod volumes
+8. The allocation of an FSGroup that owns the pod volumes
 
-	The configuration of allowable supplemental groups
+9. The configuration of allowable supplemental groups
 
-	Whether a container requires write access to its root file system
+10. Whether a container requires write access to its root file system
 
-	The usage of volume types
+11. The usage of volume types
 
-	The configuration of allowable seccomp profiles
+12. The configuration of allowable seccomp profiles
 
 Some of default SCCs are anyuid, hostaccess, hostmount-anyuid, hostnetwork, hostnetwork-v2, restricted, restricted-v2(default) etc.
 
