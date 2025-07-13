@@ -187,6 +187,7 @@ A Deployment Strategy allows you to determine how your application is rolled out
 killed for some other reason.
 
 ## Deployment Strategies on OpenShift
+
 1. ## Rolling Update(Default Strategy in OpenShift)
 In this strategy, Kubernetes/OpenShift gradually replaces old pods with new ones, ensuring that the application remains available during the update(No downtime).
 
