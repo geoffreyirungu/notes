@@ -1459,5 +1459,78 @@ What happens to your Update request depends on its stage:
 This will happen if the Workflow finished while the Update handler execution was in progress, for example because
 	* The Workflow was canceled or failed.
 	* The Workflow completed normally or continued-as-new and the Workflow author did not wait for handlers to be finished.
+**Problems when sending a Query**
+When working with Queries, you may encounter these errors:
+* **There is no Workflow Worker polling the Task Queue:** You'll receive a `WorkflowServiceException` on which the `cause `is a `StatusRuntimeException` with a status of `FAILED_PRECONDITION`.
+* **Query failed:** You'll receive a `WorkflowQueryException` exception if something goes wrong during a Query. 
+Any exception in a Query handler will trigger this error. This differs from Signal and Update requests, where exceptions can lead to Workflow Task Failure instead.
+* **The handler caused the Workflow Task to fail.** This would happen, for example, if the Query handler blocks the thread for too long without yielding.
+
+## Dynamic Components
+Dynamic components refer to the ability to handle workflows, activities, signals, queries, and updates without using predefined typed interfaces. 
+Dynamic components allow you to register, invoke, or handle workflows and activities using their names and arguments dynamically, without strict interface coupling.
+This is useful in scenarios where the types or method names are not known at compile time, such as building SDKs, workflow orchestration platforms, or developer tools.
+
+> **caution**
+> Use dynamic elements judiciously and as a fallback mechanism, not a primary design. 
+> They can introduce long-term maintainability and debugging issues. 
+> Reserve dynamic invocation use for cases where a name is not or can't be known at compile time.
+
+Temporal Java SDK has two modes for defining and interacting with workflows and activities:
+| Mode        | Description                                                                                                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Typed**   | You define Java interfaces annotated with `@WorkflowInterface` or `@ActivityInterface`, and Temporal generates a strongly typed stub for interaction.                          |
+| **Dynamic** | You implement or invoke workflows/activities without predefining an interface — instead, you refer to method names and arguments at runtime using reflection or generic stubs. |
+
+**Key Dynamic Components**
+| Component             | Dynamic API                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| **Workflows**         | `DynamicWorkflow`                                            |
+| **Activities**        | `DynamicActivity`                                            |
+| **Signal Handlers**   | `DynamicSignalHandler` 									   |
+| **Query Handlers**    | `DynamicQueryHandler`   									   |
+| **Update Handlers**   | `DynamicUpdateHandler`     								   |
+| **Client Invocation** | `WorkflowStub` and `ActivityStub` (untyped versions)         |
+
+Example: Dynamic Workflow
+Dynamic Workflow Implementation
+	public class MyDynamicWorkflow implements DynamicWorkflow {
+
+		@Override
+		public Object execute(EncodedValues args) {
+			String name = args.get(0, String.class);
+			return "Hello " + name;
+		}
+	}
+	
+You don’t define a `@WorkflowInterfac`e — instead, you implement `DynamicWorkflow`, and handle arguments dynamically.
+Client-side invocation:
+	WorkflowStub stub = client.newUntypedWorkflowStub("MyDynamicWorkflow", options);
+	String result = stub.execute(String.class, "Alice"); // dynamic execution
+
+Dynamic Activity Example
+	public class MyDynamicActivity implements DynamicActivity {
+
+		@Override
+		public Object execute(EncodedValues args) {
+			int x = args.get(0, Integer.class);
+			int y = args.get(1, Integer.class);
+			return x + y;
+		}
+	}
+
+Client-side call:
+	ActivityStub stub = Workflow.newUntypedActivityStub(ActivityOptions.newBuilder().build());
+	int result = stub.execute("MyDynamicActivity", int.class, 3, 4); // returns 7
+
+Dynamic components are useful when:
+| Use Case                             | Reason                                                                           |
+| ------------------------------------ | -------------------------------------------------------------------------------- |
+| **Workflow Orchestration Platforms** | You need to execute user-defined workflows/activities from UI or config          |
+| **SDKs or DSLs**                     | You want to let users define workflows without writing Java code directly        |
+| **Multilingual support tools**       | e.g. a Node.js or Python layer calling Java workflows                            |
+| **Testing generic behavior**         | Like creating a “router” workflow that dispatches dynamically based on arguments |
+
+
 
 

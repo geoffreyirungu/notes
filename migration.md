@@ -394,18 +394,24 @@ Other environment variables may include:
 **Backup Entire Database (SQL format)**
 	pg_dump -U postgres -h localhost -d mydb -f mydb_backup.sql
 ✅ This creates a plain .sql file you can run in psql to restore.
+
 **Backup Schema only from enterprise_process_tracker schema in the db (SQL format)**
 	pg_dump --schema-only -f schema.sql --schema=enterprise_process_tracker
+	
 **Backup data only from enterprise_process_tracker schema in the db (SQL format)**
 	pg_dump --data-only -f data.sql --schema=enterprise_process_tracker
+	
 **Backup schema and data from enterprise_process_tracker schema in the db (SQL format)**
 	pg_dump -f schema_data.sql --schema=enterprise_process_tracker
+	
 **Backup data only from enterprise_process_tracker schema from databasechangelog table (SQL format)**
 	pg_dump --data-only -t enterprise_process_tracker.databasechangelog -f databasechangelog_data.sql --schema=enterprise_process_tracker
+	
 **Custom Format for Flexibility**
 	pg_dump -U postgres -F c -f mydb_backup.dump mydb
 * -F c → Custom format
 * Use pg_restore to restore it (see below)
+
 **Compressed Dump with Password Prompt**
 	pg_dump -U postgres -W -F c -f secure_backup.dump mydb
 You'll be prompted for the password for better security.
@@ -417,6 +423,10 @@ You'll be prompted for the password for better security.
 	pg_restore -U postgres -d newdb mydb_backup.dump
 Or with options:
 	pg_restore -U postgres --create --dbname=postgres mydb_backup.dump
+	
+**Running an sql command using psql**
+psql -c "SELECT * FROM nept_user;"
+
 
 **Summary**
 | Task              | Tool                               |

@@ -1,3 +1,5 @@
+## Java And Spring
+
 
 ## Java SE (Standard Edition) and Java/Jakarta EE(Enterprise Edition)
 **Java SE (Standard Edition)** is the foundational/core Java platform that provides essential libraries and APIs for general-purpose programming.
@@ -1068,6 +1070,224 @@ and it returns a 400 Bad Request response with the exception message.
 Use @ExceptionHandler in:
 * A controller: handles exceptions for that controller only.
 * A @ControllerAdvice/@RestControllerAdvice class: handles exceptions application-wide.
+
+## What is `@InitBinder` in Spring
+`@InitBinder` is an annotation in Spring MVC used to customize the data binding process. 
+It marks methods that initialize a WebDataBinder, which is responsible for:
+* Binding HTTP request parameters to Java object properties (e.g., form data to model objects)
+* Registering custom editors and formatters for specific data types
+* Configuring allowed/disallowed fields during binding
+* Adding validators
+This helps control and customize how Spring converts web request data (typically strings) into your domain/model objects.
+**Why is `@InitBinder` useful?**
+When your controller accepts complex objects as parameters, Spring needs to convert the raw HTTP request parameters (strings) into Java types. 
+Sometimes the default conversion is not enough or you want:
+* Custom date formatting/parsing
+* Custom editors to convert strings to enums, numbers, or other types
+* To whitelist or blacklist fields that can be bound (security)
+* To register custom validators for form validation
+`@InitBinder` allows you to hook into this binding lifecycle and customize the binder for one or more controller methods.
+**Where and How to use @InitBinder?**
+* Defined inside a Spring MVC controller class or controller advice (annotated with @Controller or @RestController or @ControllerAdvice or @RestControllerAdvice)
+* Annotated methods take a WebDataBinder parameter
+* Can be limited to specific command/form object names by specifying the value attribute (optional)
+
+**A Command Object** is a Java object automatically bound from HTTP request parameters eg. "person" is a command object in the below example.
+
+**Example**
+Imagine a Spring MVC controller handling a form to create a Person object with a Date field, which needs custom date parsing.
+	import org.springframework.stereotype.Controller;
+	import org.springframework.web.bind.WebDataBinder;
+	import org.springframework.web.bind.annotation.InitBinder;
+	import org.springframework.web.bind.annotation.PostMapping;
+	import org.springframework.web.bind.annotation.ModelAttribute;
+	import org.springframework.web.bind.annotation.GetMapping;
+	import org.springframework.web.bind.annotation.RequestMapping;
+	import org.springframework.format.annotation.DateTimeFormat;
+	import org.springframework.beans.propertyeditors.CustomDateEditor;
+
+	import java.text.SimpleDateFormat;
+	import java.util.Date;
+
+	@Controller
+	@RequestMapping("/persons")
+	public class PersonController {
+
+		// Model class
+		public static class Person {
+			private String name;
+			private Date birthDate;
+
+			// getters/setters
+			public String getName() { return name; }
+			public void setName(String name) { this.name = name; }
+
+			public Date getBirthDate() { return birthDate; }
+			public void setBirthDate(Date birthDate) { this.birthDate = birthDate; }
+		}
+
+		// InitBinder method to customize binding for Person objects
+		@InitBinder("person")
+		public void initBinder(WebDataBinder binder) {
+			// Define a date format for birthDate field
+			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+			dateFormat.setLenient(false); // Strict parsing
+
+			// Register a custom editor for Date.class that uses the above format
+			// Converts from "yyyy-MM-dd" format to java.util.Date
+			binder.registerCustomEditor(Date.class, new CustomDateEditor(dateFormat, true));
+		}
+
+		@GetMapping("/create")
+		public String showForm() {
+			return "personForm";  // Returns a form view
+		}
+
+		@PostMapping("/create")
+		public String submitForm(@ModelAttribute("person") Person person) {
+			// "person" is a command object — populated automatically from request parameters
+		
+			// Here birthDate string will be converted automatically using our custom editor
+			// from "yyyy-MM-dd" format to java.util.Date
+			System.out.println("Name: " + person.getName());
+			System.out.println("BirthDate: " + person.getBirthDate());
+			return "personResult";
+		}
+	}
+Without this customization, Spring would throw a binding error or use default parsing which might not match your expected format.
+
+**What `@InitBinder` works with**
+`@InitBinder`is not limited to model attributes coming from views or forms — it works with any controller method parameter that Spring binds using a WebDataBinder. 
+That includes:
+* Model attributes from forms (traditional MVC)
+When you're binding form data to a model attribute, like in server-side rendered HTML forms.
+* DTOs in @ModelAttribute
+This works even in APIs or services that don’t render views — if you use `@ModelAttribute` explicitly.
+* DTOs in @RequestParam (for complex types)
+Binding a group of request parameters into a complex object using `@RequestParam`.
+	@GetMapping("/table")
+    public String listTable(@RequestParam("sort") SortOptions sortOptions) {
+        // /table?sort.field=name&sort.direction=asc
+        return "table";
+    }
+* DTOs in @RequestMapping, @PostMapping, etc., when not using @RequestBody
+This applies when a controller receives a complex object from form data or query string, not JSON, and does not use @RequestBody.
+	public class ProductFilter {
+		private String category;
+		private Integer maxPrice;
+		// getters/setters
+	}
+
+	@GetMapping("/products")
+    public String listProducts(ProductFilter productFilter) {
+        // Automatically bound from query params like ?category=Books&maxPrice=100
+        return "productList";
+    }
+**Note:** `@InitBinder` does not apply to DTOs annotated with @RequestBody — because those are deserialized using Jackson, not the WebDataBinder.
+	@PostMapping("/api/person")
+	public ResponseEntity<?> create(@RequestBody PersonDTO dto) {
+		// @InitBinder will NOT be triggered here
+	}
+**Why `@InitBinder` Doesn't Apply to `@RequestBody`**
+* As explained above `@InitBinder` is tied to form data, URL parameters, and command objects, which are processed using WebDataBinder.
+* `@RequestBody` uses message converters (like Jackson) instead, bypassing the WebDataBinder pipeline entirely.
+* One of the tools to use to customize json deserialization when dealing with `@RequestBody` is `@JsonDeserialize`
+
+
+**How does Spring decide which `@InitBinder` method to call?**
+* You can specify one or more command/form object names on @InitBinder (e.g. @InitBinder("person")).
+* Spring calls all methods annotated with @InitBinder that apply to the model attribute being bound.
+* If no specific target name is given, the @InitBinder method applies to all command/form objects.
+
+**Additional Use Cases of `@InitBinder`**
+* **Registering Custom Property Editors**
+To convert string IDs to Enum or other domain objects.
+	@InitBinder
+	public void initBinder(WebDataBinder binder) {
+		binder.registerCustomEditor(MyEnum.class, new MyEnumPropertyEditor());
+	}
+* **White/Blacklisting Fields**
+To prevent binding of sensitive fields:
+	@InitBinder
+	public void initBinder(WebDataBinder binder) {
+		binder.setDisallowedFields("id", "password");
+	}
+* **Adding Validators**
+	@InitBinder
+	public void initBinder(WebDataBinder binder) {
+		binder.addValidators(new PersonValidator());
+	}
+
+## What is `@JsonDeserialize` in Jackson
+`@JsonDeserialize` is a Jackson annotation used in Java (especially with Spring Boot and REST APIs) to customize how JSON data is deserialized into Java objects. 
+It’s typically used when default deserialization behavior doesn’t work (e.g. with custom formats, special data structures, or complex objects).
+**Use Cases**
+* Handling non-standard JSON formats
+* Parsing custom date formats
+* Deserializing polymorphic types
+* Pre-processing values before mapping
+
+**Example**
+**Step 1: Create a Custom Deserializer**
+	import com.fasterxml.jackson.core.JsonParser;
+	import com.fasterxml.jackson.databind.DeserializationContext;
+	import com.fasterxml.jackson.databind.JsonDeserializer;
+
+	import java.io.IOException;
+	import java.text.SimpleDateFormat;
+	import java.util.Date;
+
+	public class CustomDateDeserializer extends JsonDeserializer<Date> {
+		private static final SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy");
+
+		@Override
+		public Date deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+			try {
+				return formatter.parse(p.getText());
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+**Step 2: Apply @JsonDeserialize on the Model**
+	import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+	import java.util.Date;
+
+	public class User {
+		private String name;
+
+		@JsonDeserialize(using = CustomDateDeserializer.class)
+		private Date dob;
+
+		// Getters and setters
+	}
+**Step 3: Spring Boot Controller**
+	import org.springframework.web.bind.annotation.*;
+
+	@RestController
+	public class UserController {
+
+		@PostMapping("/register")
+		public String registerUser(@RequestBody User user) {
+			return "User: " + user.getName() + ", DOB: " + user.getDob();
+		}
+	}
+**Step 4: Sample Request**
+POST /register
+Content-Type: application/json
+
+{
+  "name": "Alice",
+  "dob": "19-07-2025"
+}
+**Output:**
+	User: Alice, DOB: Sat Jul 19 00:00:00 UTC 2025
+
+You can also deserialize things like:
+* Enum types with custom labels
+* JSON values wrapped in other structures (e.g., arrays of key-value)
+* Trimming or transforming strings
+* Base64-decoded binary data
 
 	
 ## What is @ControllerAdvice and @RestControllerAdvice
