@@ -291,6 +291,9 @@ As usual before running the `diff` command make sure liquibase has been configur
 	password=dbpass
 	driver=org.postgresql.Driver
 	changeLogFile=db/changelog/generated/changelog.yaml
+
+* **Reference = desired schema**
+* **Target = existing schema to be updated**
 	
 **Run the `liquibase diff` command(Basic Syntax)**
 	liquibase diff
