@@ -431,7 +431,21 @@ The `--output-watch-events` command instructs `kubectl` to output the change typ
 	MODIFIED   nginx-imperative-bdbc5c75b-d6c8z   0/1     Completed     0          6m27s
 	DELETED    nginx-imperative-bdbc5c75b-d6c8z   0/1     Completed     0          6m27s
 
-
+## How you can create an custom nginx controller
+The NGINX operator watches ConfigMaps and reconciles them into NGINX Deployments, delegating pod management to Kubernetes controllers.  
+* Operator = custom Kubernetes controller
+* Desired state stored in ConfigMaps
+* One ConfigMap represents one NGINX server
+* ConfigMap data contains static website content
+* Operator watches ConfigMaps and the respective events using Watch API
+* Operator runs an infinite reconciliation loop
+* On ADDED → create Deployment
+* On MODIFIED → update Deployment
+* On DELETED → delete Deployment
+* Operator delegates runtime to Deployment controller
+* NGINX pods mount ConfigMap as static content
+* No direct Pod management by operator
+* Can be implemented as a Bash script using `kubectl --watch` or any other language including Java, C++ or even JavaScript
 
 
 
