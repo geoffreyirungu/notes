@@ -448,14 +448,15 @@ The NGINX operator watches ConfigMaps and reconciles them into NGINX Deployments
 * Can be implemented as a Bash script using `kubectl --watch` or any other language including Java, C++ or even JavaScript
 * Below is a sample configmap yaml and the respective controller implemented as a bash script:  
 
+```
 	apiVersion: v1
 	kind: ConfigMap
 	metadata:
 	  name: sample
 	data:
 	  index.html: hello world
-
-
+```
+```
 	#!/usr/bin/env bash
 
 	kubectl get --watch --output-watch-events configmap \
@@ -498,7 +499,7 @@ The NGINX operator watches ConfigMaps and reconciles them into NGINX Deployments
 				;;
 		esac
 	done
-
+```
 
 
 
