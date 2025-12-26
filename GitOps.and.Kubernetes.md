@@ -280,7 +280,35 @@ So if you make any changes imperatively, you should be ready to undo the changes
 
 To stop managing a field, remove it from the YAML and re-apply the manifest so `kubectl apply` can update the last-applied annotation automatically.  
 Client-side apply(`kubectl apply`) can cause disruption by resetting managed fields (like replicas) to default values if you remove them from the manifest.  
-Server-side apply(`kubectl apply --server-side`) avoids this issue by allowing Kubernetes to remove ownership of the field without resetting it, enabling other controllers (like HPA) to continue managing it.  
+Server-side apply(`kubectl apply --server-side`) avoids this issue by allowing Kubernetes to remove ownership of the field without resetting it, enabling other controllers (like HPA) to continue managing it.   
+
+**`kubectl patch` vs `kubectl edit`**   
+`kubectl patch` imperatively applies a specific, targeted change to a Kubernetes resource by providing only the fields to update. 
+	kubectl patch cronjob gitops-cron -p '{"spec":{"suspend":true}}'
+
+`kubectl edit` imperatively opens the full live resource in an editor, allowing a human to manually modify any part of it.
+	kubectl edit deployment sample-app
+
+| Command         | Update type          | Uses last-applied | GitOps-friendliness*                               |
+| --------------- | -------------------- | ----------------- | -------------------------------------------------- |
+| `kubectl apply` | Declarative (full)   | Yes               | ✅ High – aligns with GitOps workflow               |
+| `kubectl patch` | Imperative (partial) | No                | ⚠ Medium – creates temporary, understandable drift |
+| `kubectl edit`  | Imperative (manual)  | No                | ❌ Low – broad drift, harder to reconcile           |
+
+| Aspect                          | `kubectl patch`                                                          | `kubectl edit`                                                     |
+| ------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| **How the change is made**      | Supplies an explicit partial update (patch) as part of the command       | Opens the full live resource for manual editing                    |
+| **Interaction model**           | **Non-interactive** – no editor or prompts                               | **Interactive** – human-driven editing via an editor               |
+| **Scope of change**             | Narrow and targeted (only specified fields)                              | Broad (any field can be modified)                                  |
+| **Automation suitability**      | **High** – safe for scripts, CI/CD, controllers                          | **Low** – cannot run unattended                                    |
+| **Repeatability / determinism** | **High** – same input produces the same change every time                | **Low** – depends on manual edits                                  |
+| **Risk of accidental changes**  | Low – only declared fields are touched                                   | Higher – easy to unintentionally modify unrelated fields           |
+| **Auditability**                | High – change intent is explicit in the command                          | Lower – intent is implicit in editor changes                       |
+| **GitOps compatibility**        | **High** – creates minimal, predictable drift from declarative manifests | **Low** – creates broader, less predictable drift                  |
+| **Persistence under GitOps**    | Temporary – may be overwritten unless changes are committed to Git       | Temporary – may be overwritten unless changes are committed to Git |
+| **Typical use cases**           | Targeted operational overrides, scripting, automation                    | Manual inspection, debugging, emergency fixes                      |
+
+
 
 ## Controller
 A controller is a Kubernetes component that implements control loops to continuously reconcile the actual state of cluster resources with their desired state.  
@@ -501,17 +529,174 @@ The NGINX operator watches ConfigMaps and reconciles them into NGINX Deployments
 	done
 ```
 
+## Kubernetes + GitOps
+Kubernetes enables GitOps because it's built on:
+* **Declarative specifications:** allow users to define the desired state
+* **Controllers:** continuously reconcile actual state toward desired state
+* **Eventual consistency:** reconciliation loops by controllers ensure the cluster eventually converges to the declared state
+
+Since the declarative manifests must be stored somewhere, Git became the natural medium to store these manifests.  
+GitOps then became the natural delivery model to deploy these manifests from Git to Kubernetes.  
+
+> Kubernetes’ declarative, controller-driven design makes Git the natural source of truth, leading directly to GitOps.  
+
+**Eventual consistency** is a consistency model in distributed systems that guarantees that, if no new updates are made to a given data item, 
+all replicas will eventually become consistent(synchronized) and identical, though not necessarily immediately.   
+In eventual consistency, **temporary inconsistency** is the period after a change when different parts of a distributed system observe different states of the same data.
+ 
+| Aspect                            | Strong Consistency                                         | Eventual Consistency                                                 |
+| --------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| **Definition**                    | All reads always reflect the most recent write             | Reads may temporarily return stale data; replicas converge over time |
+| **Read behavior**                 | Always latest value                                        | May be outdated temporarily                                          |
+| **Write behavior**                | Must coordinate across nodes before confirming             | Can accept writes independently; updates propagate asynchronously    |
+| **Latency / Performance**         | Slower, due to coordination                                | Faster, minimal coordination                                         |
+| **Availability**                  | Lower if nodes are down (to preserve consistency)          | Higher, system continues operating despite node failures             |
+| **Scalability**                   | Limited, difficult to scale across large clusters          | High, scales well across many nodes                                  |
+| **Fault tolerance**               | Moderate, may block operations during network partition    | High, system remains available; updates eventually propagate         |
+| **Typical Use Cases**             | Banking, payments, inventory management, financial systems | Social media feeds, CDNs, caching, telemetry, DNS, Kubernetes        |
+| **Priority / Trade-off**          | Accuracy & correctness                                     | Speed, availability, and scalability                                 |
+| **Behavior on network partition** | May reject writes (CP in CAP theorem)                      | Accepts writes, reconciles later (AP in CAP theorem)                 |
 
 
+## Implementing a basic GitOps operator in Kubernetes(basic GitOps Continuous Deployment)
+To implement your a basic GitOps operator, a continuously running control loop needs to be implemented that performs the following steps:
+* Begins by cloning the repository to fetch the configuration repository’s latest version into local storage
+* Looking for any Kubernetes manifests to apply to the cluster from the cloned repository’s filesystem
+* The `kubectl apply` step performs the actual deployment by applying all of the discovered manifests to the cluster  
+
+While this control loop could be implemented in any number of ways, most simply, it could be implemented as a Kubernetes CronJob: 
+```
+	apiVersion: batch/v1
+	kind: CronJob
+	metadata:
+	  name: gitops-cron
+	  namespace: gitops
+	spec:
+	  schedule: "*/5 * * * *"                            # Executes the GitOps reconciliation loop every five minutes
+	  concurrencyPolicy: Forbid                          # Prevents concurrent executions of the job
+	  jobTemplate:                                       # Template used to create Jobs
+		spec:
+		  backoffLimit: 0                                # Specifies the number of retries before considering a Job as failed; 0 means no retries
+		  template:
+			spec:
+			  restartPolicy: Never                       # Never restart the pod container, even if it fails
+			  serviceAccountName: gitops-serviceaccount  # ServiceAccount used by the Pod to access the Kubernetes API
+			  containers:
+			  - name: gitops-operator
+				image: gitopsbook/example-operator:v1.0  # The Docker image that has the git, find, and kubectl binaries preloaded into it
+				command: [sh, -e, -c]                    
+				args:
+				- git clone https://github.com/gitopsbook/sample-app-deployment.git /tmp/example && # Clones the latest repo to local storage
+				  find /tmp/example -name '*.yaml' -exec kubectl apply -f {} \;     # Discovers the yaml files and for each executes the kubectl apply command
+
+```
+
+Note that you would first need to apply the following supporting resources before applying the CronJob to the cluster:
+
+```
+	apiVersion: v1
+	kind: Namespace
+	metadata:
+	  name: gitops
+
+	---
+	apiVersion: v1
+	kind: ServiceAccount
+	metadata:
+	  name: gitops-serviceaccount
+	  namespace: gitops
+
+	---
+	apiVersion: rbac.authorization.k8s.io/v1
+	kind: ClusterRoleBinding
+	metadata:
+	  name: gitops-operator
+	roleRef:
+	  apiGroup: rbac.authorization.k8s.io
+	  kind: ClusterRole
+	  name: admin
+	subjects:
+	- kind: ServiceAccount
+	  name: gitops-serviceaccount
+	  namespace: gitops
+```
+
+**MULTIRESOURCE YAML FILES** Management of multiple resources can be simplified by grouping them in the same file (separated by --- in YAML) like the one above.
+
+This example is primitive, meant to illustrate the fundamental concepts of a GitOps continuous delivery operator.   
+It is not meant for any real production use since it lacks many features needed in a real-world production environment.   
+For example, it cannot prune any resources that are no longer defined in Git. Another limitation is that it does not deal with any credentials required to connect to the Git repository.
 
 
+## Implementing a basic GitOps CI pipeline
+In the previous section, we implemented a basic GitOps CD mechanism that continuously delivers manifests in a Git repository to the cluster.  
+The next step is to integrate this process with a CI pipeline, which publishes new container images and updates the Kubernetes manifests with the new image.  
+The CI pipeline commits the desired change into Git and trusts that sometime later, the new changes will be detected by the GitOps operator and applied.  
+The goal of a GitOps CI pipeline is to:  
+* Build your application and run unit testing as necessary
+* Publish a new container image to a container registry
+* Update the Kubernetes manifests in Git to reflect the new image  
+The following example is a typical series of commands that would be executed in a CI pipeline to achieve this:
+```
+	export VERSION=$(git rev-parse HEAD | cut -c1-7)   # Use first 7 chars of current commit SHA as version
+	make build                                         # Build the application
+	make test                                          # Run tests
+	export NEW_IMAGE="gitopsbook/sample-app:${VERSION}" 
+	docker build -t ${NEW_IMAGE} .                    # Build container image tagged with version
+	docker push ${NEW_IMAGE}                           # Push image to container registry
+
+	git clone http://github.com/gitopsbook/sample-app-deployment.git   # Clone Git repo with Kubernetes manifests
+	cd sample-app-deployment
+
+	kubectl patch \                                   # Update deployment manifest with new image (local, no cluster API call)
+	 --local \
+	 -o yaml \
+	 -f deployment.yaml \
+	 -p "spec:
+	 template:
+	 spec:
+	 containers:
+	 - name: sample-app
+	 image: ${NEW_IMAGE}" \
+	 > /tmp/newdeployment.yaml
+	mv /tmp/newdeployment.yaml deployment.yaml      # Replace old manifest with patched version
+
+	git commit deployment.yaml -m "Update sample-app image to ${NEW_IMAGE}"  # Commit manifest changes
+	git push                                         # Push changes back to Git repo
+```
+This example pipeline is one way that a GitOps CI pipeline may look.   
+There are some important points to highlight regarding the different choices you might make that would better suit your need.  
 
 
+**IMAGE TAGS AND THE TRAP OF THE LATEST TAG**  
+It is important to use a unique version string (like a commit-SHA) that is different in each build since the version is incorporated as part of the container image tag.   
+A common mistake that people make is to use latest as their image tag (such as gitopsbook/sample-app:latest) or reuse the same image tag from build to build.   
+Reusing image tags from build to build is a terrible practice for several reasons:  
+* Kubernetes will not deploy the new version to the cluster. This is because the second time the manifests are attempted to be applied, Kubernetes will  
+not detect any change in the manifests(no difference between the manifests), and the second `kubectl apply` will have zero effect.
+For Kubernetes to redeploy, something needs to be different in the Deployment spec from the first build to the second. Using unique container image tags ensures there is a difference. 
+* There's no traceability.  By incorporating something like the application’s Git commit SHA tag you keep track of the application running.
+* Rollback to the older version becomes impossible. When you reuse image tags, you are overriding or rewriting the meaning of that overwritten image  
 
+For these reasons, it is not recommended to reuse image tags, such as `latest`, at least in production environments. 
+With that said, in dev and test environments, continuously creating new and unique image tags (which likely never get cleaned up) could cause an excessive amount of disk usage in your container registry or become
+unmanageable just by the sheer number of image tags.   
+In these scenarios, reusing image tags may be appropriate, understanding Kubernetes’ behavior of not doing anything when the same specification is applied twice.
 
+**KUBECTL ROLLOUT RESTART** Kubectl has a convenience command, `kubectl rollout restart`, which causes all the Pods of a deployment to restart(even if the image tag is the same).  
+It is useful in dev and test scenarios where the image tag has been overwritten and redeploy is desired.   
+It works by injecting an arbitrary timestamp into the Pod template metadata annotations. 
+This causes the Pod spec to be different from what it was before, which causes a regular, rolling update of the Pods.
 
+	kubectl rollout restart deployment sample-app
 
+One thing to note is that our CI example uses a Git commit-SHA as the unique image tag.   
+But instead of a Git commit-SHA, the image tag could incorporate any other unique identifier, such as a semantic version, a build number, a date/time string, or
+even a combination of these pieces of information.
 
+**SEMANTIC VERSION** A semantic version is a versioning methodology that uses a three-digit convention (MAJOR.MINOR.PATCH) to convey the meaning of a version (such as v2.0.1).   
+MAJOR is incremented when there are incompatible API changes. MINOR is incremented when functionality is added in a
+backward-compatible manner. PATCH is incremented when there are backward-compatible bug fixes.
 
 
 
